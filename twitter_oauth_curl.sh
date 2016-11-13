@@ -10,6 +10,7 @@ NONCE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 
 # generate an OAuth 1.0a HMAC-SHA1 signature for a HTTP request
 URL="https://api.twitter.com/oauth/request_token"
+BASEURL="https://api.twitter.com/oauth"
 METHOD="POST"
 SIGNATURE_METHOD="HMAC-SHA1"
 SIGNATURE=""
@@ -55,8 +56,11 @@ rawurlencode() {
 }
 
 create_signature() {
+    local url="${BASEURL}${1}"
     local sig=""
-    local url="${URL}"
+    # if second arg provided, this is the token secret provided
+    # local key="" || ${2}
+    local key=$( rawurlencode "$CONSUMER_SECRET" )
     local method="${METHOD}" 
 
     # build params
@@ -66,7 +70,8 @@ create_signature() {
     sig+="oauth_timestamp=${TIMESTAMP}&"
 
     # oauth_token - shouldn't this have been obtained by user granting permission?
-    sig+="oauth_token=${CONSUMER_SECRET}&"
+    # - NO: can't do this at request_token stage
+    # sig+="oauth_token=${CONSUMER_SECRET}&"
     sig+="oauth_version=1.0"
 
     #encode
@@ -74,40 +79,24 @@ create_signature() {
     url=$( rawurlencode "$url" ) 
 
     #create 
-    SIGNATURE="${method}&${url}&${sig}"
+    SIGNATURE=`echo -n "${method}&${url}&${sig}" | openssl dgst -sha1 -hmac "${key}&" | sed 's/^.* //'`
 
     # use openssl lib to create SHA1 hash
     # echo -n "value" | openssl sha1 -hmac "key"
 
 }
 
-create_signature
-
-####
-echo CONSUMER_KEY: $CONSUMER_KEY
-echo CONSUMER_SECRET: $CONSUMER_SECRET
-echo CALLBACK: $( rawurlencode "$CALLBACK" )
-echo TIMESTAMP: $TIMESTAMP
-echo NONCE: $NONCE
-echo URL: $( rawurlencode "$URL" )
-echo SIGNATURE: $SIGNATURE
-
-
-
+create_signature "/request_token"
+CALLBACK=$( rawurlencode "$CALLBACK" )
 
 # fire
-#curl \
-#  -X POST                                               \
-#  -H "User-Agent: foo HTTP Client"                      \
-#  -H "Content-type: application/json"                   \
-#  -H "Authorization: OAuth "                            \
-#  -H "oauth_callback=$CALLBACK"                                  \
-#  -H "oauth_consumer_key=$CONSUMER_KEY"                              \
-#  -H "oauth_nonce=$NONCE"                                     \
-#  -H "oauth_signature=$SIGNATURE"                                 \
-#  -H "oauth_signature_method=HMAC-SHA1"                 \
-#  -H "oauth_timestamp=$TIMESTAMP"                       \
-#  -H "oauth_version=1.0"                                \
-#  "https://api.twitter.com/oauth/request_token"
+curl \
+  -I \
+  -v \
+  -X POST \
+  -H "User-Agent: FooBar HTTP Client" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: OAuth oauth_callback=\"$CALLBACK\",oauth_consumer_key=\"$CONSUMER_KEY\",oauth_nonce=\"$NONCE\",oauth_signature=\"$SIGNATURE\",oauth_signature_method=\"$SIGNATURE_METHOD\",oauth_timestamp=\"$TIMESTAMP\",oauth_version=\"1.0\"" \
+  "$BASEURL/request_token"
 
 exit 0
