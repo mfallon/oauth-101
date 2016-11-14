@@ -80,6 +80,7 @@ create_signature() {
 
     #create 
     SIGNATURE=`echo -n "${method}&${url}&${sig}" | openssl dgst -sha1 -hmac "${key}&" | sed 's/^.* //'`
+    SIGNATURE=$( rawurlencode "$SIGNATURE" )
 
     # use openssl lib to create SHA1 hash
     # echo -n "value" | openssl sha1 -hmac "key"
@@ -91,7 +92,6 @@ CALLBACK=$( rawurlencode "$CALLBACK" )
 
 # fire
 curl \
-  -I \
   -v \
   -X POST \
   -H "User-Agent: FooBar HTTP Client" \
